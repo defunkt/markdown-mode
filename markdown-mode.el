@@ -810,6 +810,11 @@ wiki links of the form [[PageName|link text]].  In this regular
 expression, #1 matches the page name and #3 matches the link
 text.")
 
+(defconst markdown-regex-ikiwiki-directive
+  "\\[\\[![^]]+?\\]\\]"
+  "Regular expression for matching ikiwiki directives of the form
+[[!command param1='test']].")
+
 (defconst markdown-regex-uri
   (concat
    "\\(" (mapconcat 'identity markdown-uri-types "\\|")
@@ -2072,13 +2077,15 @@ match the current file name after conversion.  This modifies the data
 returned by `match-data'.  Note that the potential wiki link name must
 be available via `match-string'."
   (let ((case-fold-search nil))
-    (and (thing-at-point-looking-at markdown-regex-wiki-link)
-	 (or (not buffer-file-name)
-	     (not (string-equal (buffer-file-name)
-				(markdown-convert-wiki-link-to-filename
-                                 (markdown-wiki-link-link)))))
-	 (not (save-match-data
-		(save-excursion))))))
+    (and (and (eq major-mode 'ikiwiki-mode)
+				  (not (thing-at-point-looking-at markdown-regex-ikiwiki-directive)))
+			(thing-at-point-looking-at markdown-regex-wiki-link)
+			(or (not buffer-file-name)
+				 (not (string-equal (buffer-file-name)
+										  (markdown-convert-wiki-link-to-filename
+											(markdown-wiki-link-link)))))
+			(not (save-match-data
+					 (save-excursion))))))
 
 (defun markdown-wiki-link-link ()
   "Return the link part of the wiki link using current match data.
@@ -2318,6 +2325,11 @@ This is an exact copy of `line-number-at-pos' for use in emacs21."
   ;; do the initial link fontification
   (markdown-fontify-buffer-wiki-links))
 
+;;; Ikiwiki Markdown Mode  ============================================
+
+(define-derived-mode ikiwiki-mode markdown-mode "MarkdownIki"
+  "Major mode for editing Ikiwiki Markdown files."
+)
 
 (provide 'markdown-mode)
 
