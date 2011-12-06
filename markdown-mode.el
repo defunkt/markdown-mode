@@ -590,6 +590,9 @@ This will not take effect until Emacs is restarted."
 (defvar markdown-missing-link-face 'markdown-missing-link-face
   "Face name to use for links where the linked file does not exist.")
 
+(defvar markdown-ikiwiki-directive-face 'markdown-ikiwiki-directive-face
+  "Face name to use for ikiwiki-directives.")
+
 (defvar markdown-reference-face 'markdown-reference-face
   "Face name to use for reference.")
 
@@ -686,6 +689,11 @@ This will not take effect until Emacs is restarted."
 (defface markdown-missing-link-face
   '((t (:inherit font-lock-warning-face)))
   "Face for missing links."
+  :group 'markdown-faces)
+
+(defface markdown-ikiwiki-directive-face
+  '((t (:inherit markdown-header-face)))
+  "Face for ikiwiki-directives."
   :group 'markdown-faces)
 
 (defface markdown-reference-face
@@ -891,6 +899,13 @@ text.")
    ;; Equation reference \eqref{foo}
    (cons "\\\\eqref{\\w+}" 'markdown-reference-face))
   "Syntax highlighting for LaTeX fragments.")
+
+(defconst markdown-mode-font-lock-keywords-ikiwiki
+  (list
+   ;; directive [[!command ]]
+   (cons markdown-regex-ikiwiki-directive
+			'markdown-ikiwiki-directive-face))
+  "Syntax highlighting for Ikiwiki-specific statements.")
 
 (defvar markdown-mode-font-lock-keywords
   (append
@@ -2077,9 +2092,7 @@ match the current file name after conversion.  This modifies the data
 returned by `match-data'.  Note that the potential wiki link name must
 be available via `match-string'."
   (let ((case-fold-search nil))
-    (and (and (eq major-mode 'ikiwiki-mode)
-				  (not (thing-at-point-looking-at markdown-regex-ikiwiki-directive)))
-			(thing-at-point-looking-at markdown-regex-wiki-link)
+    (and (thing-at-point-looking-at markdown-regex-wiki-link)
 			(or (not buffer-file-name)
 				 (not (string-equal (buffer-file-name)
 										  (markdown-convert-wiki-link-to-filename
@@ -2329,6 +2342,21 @@ This is an exact copy of `line-number-at-pos' for use in emacs21."
 
 (define-derived-mode ikiwiki-mode markdown-mode "MarkdownIki"
   "Major mode for editing Ikiwiki Markdown files."
+
+  ;; change regex to exclude ikiwiki-directives 
+  (setq markdown-regex-wiki-link
+		  "\\[\\[\\([^!][^]|]+\\)\\(|\\([^]]+\\)\\)?\\]\\]")
+
+  ;; Font lock.
+  (setq markdown-mode-font-lock-keywords 
+		  (append markdown-mode-font-lock-keywords-ikiwiki
+					 markdown-mode-font-lock-keywords ))
+  (set (make-local-variable 'font-lock-defaults)
+       '(markdown-mode-font-lock-keywords))
+
+
+  ;; do the initial link fontification
+  (markdown-fontify-buffer-wiki-links)
 )
 
 (provide 'markdown-mode)
