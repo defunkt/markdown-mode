@@ -2126,8 +2126,7 @@ and [[test test]] both map to Test-test.ext."
 
 (defun markdown-follow-wiki-link (name)
   "Follow the wiki link NAME.
-Convert the name to a file name and call `find-file'.  Ensure that
-the new buffer remains in `markdown-mode'."
+Convert the name to a file name and call `find-file'."
   (let ((filename (markdown-convert-wiki-link-to-filename name)))
     (find-file filename)))
 
@@ -2140,18 +2139,6 @@ See `markdown-wiki-link-p' and `markdown-follow-wiki-link'."
       (markdown-follow-wiki-link (markdown-wiki-link-link))
     (error "Point is not at a Wiki Link")))
 
-(defun markdown-follow-wiki-link-at-point-ikiwiki ()
-  "Find Wiki Link at point. Asks whether it should be
-created in a subdirectory of the current file or in the cwd.
-This function replaces `markdown-follow-wiki-link-at-point'
-in `ikiwiki-mode'.
-See `markdown-wiki-link-p' and `markdown-follow-wiki-link'."
-  (interactive)
-  (progn
-	 (message "ikiwiki-follow")
-	 (if (markdown-wiki-link-p)
-		  (markdown-follow-wiki-link (markdown-wiki-link-link))
-		(error "Point is not at a Wiki Link"))) )
 
 (defun markdown-next-wiki-link ()
   "Jump to next wiki link.
@@ -2361,9 +2348,30 @@ This is an exact copy of `line-number-at-pos' for use in emacs21."
   (setq markdown-regex-wiki-link
 		  "\\[\\[\\([^!][^]|]+\\)\\(|\\([^]]+\\)\\)?\\]\\]")
 
-  ;; change link-following function to prompt for filename
+
   (message "loading ikiwiki-mode")
-  (setq markdown-follow-wiki-link-at-point 'markdown-follow-wiki-link-at-point-ikiwiki)
+
+
+  (defun markdown-follow-wiki-link-to-file (file)
+	 ""
+	 (interactive (list 
+						(read-string "File: "  
+										 (concat 
+										  (file-name-as-directory (file-name-sans-extension (buffer-name)))
+										  (markdown-convert-wiki-link-to-filename 
+											(markdown-wiki-link-link))))))
+	 (message"filename is %s" file))
+
+  ;; change link-following function to prompt for filename
+  (defun markdown-follow-wiki-link-at-point ()
+	 "Find Wiki Link at point. Asks whether it should be
+created in a subdirectory of the current file or in the cwd.
+This function replaces `markdown-follow-wiki-link-at-point'
+in `ikiwiki-mode'.
+See `markdown-wiki-link-p' and `markdown-follow-wiki-link'."
+	 (interactive)
+	 (call-interactively 'markdown-follow-wiki-link-to-file))
+
 
   ;; Font lock.
   (setq markdown-mode-font-lock-keywords 
