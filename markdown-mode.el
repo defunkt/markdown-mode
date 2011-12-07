@@ -492,6 +492,11 @@ buffers which are visiting a file."
   :group 'markdown
   :type 'boolean)
 
+(defcustom markdown-ikiwiki-toplevel nil
+  "Path to main ikiwiki-directory."
+  :group 'markdown
+  :type 'string)
+
 (defcustom markdown-wiki-link-alias-first t
   "When non-nil, treat aliased wiki links like [[alias text|PageName]].
 Otherwise, they will be treated as [[PageName|alias text]]."
@@ -2139,6 +2144,67 @@ See `markdown-wiki-link-p' and `markdown-follow-wiki-link'."
       (markdown-follow-wiki-link (markdown-wiki-link-link))
     (error "Point is not at a Wiki Link")))
 
+(defun markdown-follow-wiki-link-file (file)
+  "Given a path, open a new file at this location,
+possibly creating directories. Used in conjunction with
+`markdown-follow-wiki-link-at-point-ikiwiki' to allow opening
+files in different locations."
+  (interactive (list 
+					 (read-string 
+					  "File: "  
+					  (concat 
+						(file-name-as-directory (file-name-sans-extension (buffer-name)))
+						(markdown-convert-wiki-link-to-filename 
+						 (markdown-wiki-link-link))))))
+  (let ( (dir (file-name-directory file)) )
+	 (if dir (make-directory (file-name-directory file) t) )
+	 (find-file file)
+	 (message"filename is %s" file)) )
+
+(defun markdown-follow-wiki-link-at-point-ikiwiki (option)
+  "In Ikiwiki, [[link]]'s can link to three different files:
+a) files located in the top-level hierarchy of the wiki
+b) files in the current working directory
+c) files in a subdirectory of the name of the current page.
+When calling the current function, the user is prompted as to in
+which of the three locations he wishes to create/visit the file.
+For the top-level option, the variable `markdown-ikiwiki-toplevel' 
+needs to be set. Default is (b)."
+  (interactive (list (read-char 
+							 (let ( (a (if markdown-ikiwiki-toplevel "(a) top-level " nil))
+									  (b "(b) current dir ")
+									  (c "(c) subdir of current page "))
+								(progn 
+								  (if (and a (file-exists-p 
+												  (concat (file-name-as-directory markdown-ikiwiki-toplevel)
+															 (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link)))))
+										(put-text-property 0 (length a) 'face 'markdown-link-face a)
+									 (put-text-property 0 (length a) 'face 'markdown-missing-link-face a) )
+								  (if (file-exists-p 
+										 (concat (file-name-as-directory (file-name-sans-extension (buffer-name)))
+													(markdown-convert-wiki-link-to-filename 
+													 (markdown-wiki-link-link)) ))		 
+										(put-text-property 0 (length c) 'face 'markdown-link-face c)
+									 (put-text-property 0 (length c) 'face 'markdown-missing-link-face c) )
+								  (if (file-exists-p 
+										 (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link)))
+										(put-text-property 0 (length b) 'face 'markdown-link-face b)
+									 (put-text-property 0 (length b) 'face 'markdown-missing-link-face b) )
+								  (concat a (if a "\t|\t") b "\t|\t" c ))))))
+  (message "option = %s" (char-to-string option))
+  (message "wiki-link-link = %s" (markdown-wiki-link-link))
+  (let* ((opt (char-to-string option))
+			(filename (if (and markdown-ikiwiki-toplevel (string= opt "a"))
+							  (concat (file-name-as-directory markdown-ikiwiki-toplevel)
+										 (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link)))
+							(if (string= opt "c")
+								 (concat (file-name-as-directory (file-name-sans-extension (buffer-name)))
+											(markdown-convert-wiki-link-to-filename 
+											 (markdown-wiki-link-link)) )
+							  (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link))))))
+	 (message "filename is %s" filename) 
+	 (markdown-follow-wiki-link-file filename)))
+
 
 (defun markdown-next-wiki-link ()
   "Jump to next wiki link.
@@ -2343,24 +2409,12 @@ This is an exact copy of `line-number-at-pos' for use in emacs21."
 
 (define-derived-mode ikiwiki-mode markdown-mode "MarkdownIki"
   "Major mode for editing Ikiwiki Markdown files."
+  (message "Loading ikiwiki-mode")
 
   ;; change regex to exclude ikiwiki-directives 
   (setq markdown-regex-wiki-link
 		  "\\[\\[\\([^!][^]|]+\\)\\(|\\([^]]+\\)\\)?\\]\\]")
 
-
-  (message "loading ikiwiki-mode")
-
-
-  (defun markdown-follow-wiki-link-to-file (file)
-	 ""
-	 (interactive (list 
-						(read-string "File: "  
-										 (concat 
-										  (file-name-as-directory (file-name-sans-extension (buffer-name)))
-										  (markdown-convert-wiki-link-to-filename 
-											(markdown-wiki-link-link))))))
-	 (message"filename is %s" file))
 
   ;; change link-following function to prompt for filename
   (defun markdown-follow-wiki-link-at-point ()
@@ -2370,7 +2424,7 @@ This function replaces `markdown-follow-wiki-link-at-point'
 in `ikiwiki-mode'.
 See `markdown-wiki-link-p' and `markdown-follow-wiki-link'."
 	 (interactive)
-	 (call-interactively 'markdown-follow-wiki-link-to-file))
+	 (call-interactively 'markdown-follow-wiki-link-at-point-ikiwiki))
 
 
   ;; Font lock.
