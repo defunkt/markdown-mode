@@ -2159,7 +2159,7 @@ files in different locations."
   (let ( (dir (file-name-directory file)) )
 	 (if dir (make-directory (file-name-directory file) t) )
 	 (find-file file)
-	 (message"filename is %s" file)) )
+	 (message "filename is %s" file)) )
 
 (defun markdown-follow-wiki-link-at-point-ikiwiki (option)
   "In Ikiwiki, [[link]]'s can link to three different files:
@@ -2191,8 +2191,6 @@ needs to be set. Default is (b)."
 										(put-text-property 0 (length b) 'face 'markdown-link-face b)
 									 (put-text-property 0 (length b) 'face 'markdown-missing-link-face b) )
 								  (concat a (if a "\t|\t") b "\t|\t" c ))))))
-  (message "option = %s" (char-to-string option))
-  (message "wiki-link-link = %s" (markdown-wiki-link-link))
   (let* ((opt (char-to-string option))
 			(filename (if (and markdown-ikiwiki-toplevel (string= opt "a"))
 							  (concat (file-name-as-directory markdown-ikiwiki-toplevel)
@@ -2423,9 +2421,10 @@ created in a subdirectory of the current file or in the cwd.
 This function replaces `markdown-follow-wiki-link-at-point'
 in `ikiwiki-mode'.
 See `markdown-wiki-link-p' and `markdown-follow-wiki-link'."
-	 (interactive)
-	 (call-interactively 'markdown-follow-wiki-link-at-point-ikiwiki))
-
+	 (interactive) 
+	 (if (markdown-wiki-link-p)
+		  (call-interactively 'markdown-follow-wiki-link-at-point-ikiwiki)
+		(error "Point is not at a Wiki Link")))
 
   ;; Font lock.
   (setq markdown-mode-font-lock-keywords 
