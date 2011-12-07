@@ -1,4 +1,4 @@
-;;; backup --- Emacs Major mode for Markdown-formatted text files
+;;; markdown-mode.el --- Emacs Major mode for Markdown-formatted text files
 
 ;; Copyright (C) 2007-2011 Jason R. Blevins <jrblevin@sdf.org>
 ;; Copyright (C) 2007, 2009 Edward O'Connor <ted@oconnor.cx>
@@ -2129,8 +2129,8 @@ and [[test test]] both map to Test-test.ext."
 Convert the name to a file name and call `find-file'.  Ensure that
 the new buffer remains in `markdown-mode'."
   (let ((filename (markdown-convert-wiki-link-to-filename name)))
-    (find-file filename))
-  (markdown-mode))
+    (find-file filename)))
+
 
 (defun markdown-follow-wiki-link-at-point ()
   "Find Wiki Link at point.
