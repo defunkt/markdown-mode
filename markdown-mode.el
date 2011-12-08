@@ -2163,6 +2163,7 @@ files in different locations."
 
 (defun markdown-linked-file-exists-p (file &optional LOCATION)
   "Check if file exists in different possible locations. 
+Returns the full file name or nil.
 
 LOCATION can be one of 'toplevel', 'cwd' or 'subdir'
 corresponding to `markdown-ikiwiki-toplevel', the current working
@@ -2175,20 +2176,21 @@ identical to `file-exists-p'.
   (if (eq major-mode 'ikiwiki-mode)
 		(if (and (or (not LOCATION) (string= LOCATION "toplevel")) 
 					markdown-ikiwiki-toplevel
-					(file-exists-p
-					 (concat (file-name-as-directory
-								 markdown-ikiwiki-toplevel) file))) 
-			 t
+					(file-exists-p (setq fullfile 
+												(concat (file-name-as-directory
+								 markdown-ikiwiki-toplevel) file))))
+			 fullfile
 		  (if (and (or (not LOCATION) (string= LOCATION "cwd"))
-					  (file-exists-p file)) t
+					  (file-exists-p file)) file
 			 (if (and (or (not LOCATION) (string= LOCATION "subdir"))
-						 (file-exists-p
-						  (concat (file-name-as-directory 
-									  (file-name-sans-extension (buffer-name)))
-									 file ))) 
-				  t 
+						 (file-exists-p 
+						  (setq fullfile
+								  (concat (file-name-as-directory 
+											  (file-name-sans-extension (buffer-name)))
+											 file ))))
+				  fullfile
 				nil)))
-		(file-exists-p file) ))
+	 (file-exists-p file) ))
 
 
 (defun markdown-follow-wiki-link-at-point-ikiwiki (option)
@@ -2215,7 +2217,7 @@ needs to be set. Default is (b)."
 									 (put-text-property 0 (length c) 'face 'markdown-link-face c)
 								  (put-text-property 0 (length c) 'face 'markdown-missing-link-face c) )
 								(concat a (if a "\t|\t") b "\t|\t" c )))))
-  (let* ((opt (char-to-string option))
+  (let* ((opt (char-to-string option)) 
 			(filename (if (and markdown-ikiwiki-toplevel (string= opt "a"))
 							  (concat (file-name-as-directory markdown-ikiwiki-toplevel)
 										 (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link)))
