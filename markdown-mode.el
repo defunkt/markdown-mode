@@ -823,6 +823,13 @@ wiki links of the form [[PageName|link text]].  In this regular
 expression, #1 matches the page name and #3 matches the link
 text.")
 
+(defconst markdown-regex-wiki-link-ikiwiki
+  "\\[\\[\\([^!][^]|]+\\)\\(|\\([^]]+\\)\\)?\\]\\]"
+  "Regular expression for matching wiki links.
+Similar to `markdown-regex-wiki-link' except, that 
+links beginning with '!' are not matched (because
+these are ikiwiki-directives.")
+
 (defconst markdown-regex-ikiwiki-directive
   "\\[\\[![^]]+?\\]\\]"
   "Regular expression for matching ikiwiki directives of the form
@@ -2098,7 +2105,9 @@ match the current file name after conversion.  This modifies the data
 returned by `match-data'.  Note that the potential wiki link name must
 be available via `match-string'."
   (let ((case-fold-search nil))
-    (and (thing-at-point-looking-at markdown-regex-wiki-link)
+    (and (thing-at-point-looking-at (if (eq major-mode 'ikiwiki-mode) 
+													 markdown-regex-wiki-link-ikiwiki
+												  markdown-regex-wiki-link))
 			(or (not buffer-file-name)
 				 (not (string-equal (buffer-file-name)
 										  (markdown-convert-wiki-link-to-filename
@@ -2243,14 +2252,18 @@ See `markdown-wiki-link-p'."
       (goto-char (+ 1 (match-end 0))))
   (save-match-data
     ; Search for the next wiki link and move to the beginning.
-    (re-search-forward markdown-regex-wiki-link nil t)
+    (re-search-forward (if (eq major-mode 'ikiwiki-mode) 
+									markdown-regex-wiki-link-ikiwiki 
+								 markdown-regex-wiki-link) nil t)
     (goto-char (match-beginning 0))))
 
 (defun markdown-previous-wiki-link ()
   "Jump to previous wiki link.
 See `markdown-wiki-link-p'."
   (interactive)
-  (re-search-backward markdown-regex-wiki-link nil t))
+  (re-search-backward (if (eq major-mode 'ikiwiki-mode) 
+								  markdown-regex-wiki-link-ikiwiki 
+								markdown-regex-wiki-link) nil t))
 
 (defun markdown-highlight-wiki-link (from to face)
   "Highlight the wiki link in the region between FROM and TO using FACE."
@@ -2268,7 +2281,9 @@ If a wiki link is found check to see if the backing file exists
 and highlight accordingly. Checking for the backing file is done using
 `markdown-linked-file-exists-p'"
   (goto-char from)
-  (while (re-search-forward markdown-regex-wiki-link to t)
+  (while (re-search-forward (if (eq major-mode 'ikiwiki-mode) 
+										  markdown-regex-wiki-link-ikiwiki 
+										markdown-regex-wiki-link) to t)
     (let ((highlight-beginning (match-beginning 0))
 	  (highlight-end (match-end 0))
 	  (file-name
@@ -2435,14 +2450,9 @@ This is an exact copy of `line-number-at-pos' for use in emacs21."
   (markdown-fontify-buffer-wiki-links))
 
 ;;; Ikiwiki Markdown Mode  ============================================
-
 (define-derived-mode ikiwiki-mode markdown-mode "MarkdownIki"
   "Major mode for editing Ikiwiki Markdown files."
   (message "Loading ikiwiki-mode")
-
-  ;; change regex to exclude ikiwiki-directives 
-  (setq markdown-regex-wiki-link
-		  "\\[\\[\\([^!][^]|]+\\)\\(|\\([^]]+\\)\\)?\\]\\]")
 
   ;; Font lock.
   (setq markdown-mode-font-lock-keywords 
@@ -2451,9 +2461,10 @@ This is an exact copy of `line-number-at-pos' for use in emacs21."
   (set (make-local-variable 'font-lock-defaults)
        '(markdown-mode-font-lock-keywords))
 
-
   ;; do the initial link fontification
   (markdown-fontify-buffer-wiki-links)
+
+;  (add-hook 'after-change-major-mode-hook 'leave-ikiwiki-mode)
 )
 
 (provide 'markdown-mode)
