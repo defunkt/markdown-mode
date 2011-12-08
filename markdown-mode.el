@@ -697,7 +697,7 @@ This will not take effect until Emacs is restarted."
   :group 'markdown-faces)
 
 (defface markdown-ikiwiki-directive-face
-  '((t (:inherit markdown-header-face)))
+  '((t (:inherit font-lock-warning-face :weight normal)))
   "Face for ikiwiki-directives."
   :group 'markdown-faces)
 
