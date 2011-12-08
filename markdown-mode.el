@@ -2161,6 +2161,36 @@ files in different locations."
 	 (find-file file)
 	 (message "filename is %s" file)) )
 
+(defun markdown-linked-file-exists-p (file &optional LOCATION)
+  "Check if file exists in different possible locations. 
+
+LOCATION can be one of 'toplevel', 'cwd' or 'subdir'
+corresponding to `markdown-ikiwiki-toplevel', the current working
+directory and a subdirectory of the same name as
+the (extensionless) `buffer-name'. If nil, all three locations are checked.
+
+This behaviour is only used when in `ikiwiki-mode'. Else, it is
+identical to `file-exists-p'.
+"
+  (if (eq major-mode 'ikiwiki-mode)
+		(if (and (or (not LOCATION) (string= LOCATION "toplevel")) 
+					markdown-ikiwiki-toplevel
+					(file-exists-p
+					 (concat (file-name-as-directory
+								 markdown-ikiwiki-toplevel) file))) 
+			 t
+		  (if (and (or (not LOCATION) (string= LOCATION "cwd"))
+					  (file-exists-p file)) t
+			 (if (and (or (not LOCATION) (string= LOCATION "subdir"))
+						 (file-exists-p
+						  (concat (file-name-as-directory 
+									  (file-name-sans-extension (buffer-name)))
+									 file ))) 
+				  t 
+				nil)))
+		(file-exists-p file) ))
+
+
 (defun markdown-follow-wiki-link-at-point-ikiwiki (option)
   "In Ikiwiki, [[link]]'s can link to three different files:
 a) files located in the top-level hierarchy of the wiki
@@ -2173,24 +2203,18 @@ needs to be set. Default is (b)."
   (interactive (list (read-char 
 							 (let ( (a (if markdown-ikiwiki-toplevel "(a) top-level " nil))
 									  (b "(b) current dir ")
-									  (c "(c) subdir of current page "))
-								(progn 
-								  (if (and a (file-exists-p 
-												  (concat (file-name-as-directory markdown-ikiwiki-toplevel)
-															 (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link)))))
-										(put-text-property 0 (length a) 'face 'markdown-link-face a)
-									 (put-text-property 0 (length a) 'face 'markdown-missing-link-face a) )
-								  (if (file-exists-p 
-										 (concat (file-name-as-directory (file-name-sans-extension (buffer-name)))
-													(markdown-convert-wiki-link-to-filename 
-													 (markdown-wiki-link-link)) ))		 
-										(put-text-property 0 (length c) 'face 'markdown-link-face c)
-									 (put-text-property 0 (length c) 'face 'markdown-missing-link-face c) )
-								  (if (file-exists-p 
-										 (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link)))
-										(put-text-property 0 (length b) 'face 'markdown-link-face b)
-									 (put-text-property 0 (length b) 'face 'markdown-missing-link-face b) )
-								  (concat a (if a "\t|\t") b "\t|\t" c ))))))
+									  (c "(c) subdir of current page ")
+									  (file (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link))))
+								(if (and a (markdown-linked-file-exists-p file "toplevel"))
+									 (put-text-property 0 (length a) 'face 'markdown-link-face a)
+								  (put-text-property 0 (length a) 'face 'markdown-missing-link-face a) )
+								(if (markdown-linked-file-exists-p file "cwd")
+									 (put-text-property 0 (length b) 'face 'markdown-link-face b)
+								  (put-text-property 0 (length b) 'face 'markdown-missing-link-face b) )
+								(if (markdown-linked-file-exists-p file "subdir") 
+									 (put-text-property 0 (length c) 'face 'markdown-link-face c)
+								  (put-text-property 0 (length c) 'face 'markdown-missing-link-face c) )
+								(concat a (if a "\t|\t") b "\t|\t" c )))))
   (let* ((opt (char-to-string option))
 			(filename (if (and markdown-ikiwiki-toplevel (string= opt "a"))
 							  (concat (file-name-as-directory markdown-ikiwiki-toplevel)
@@ -2235,7 +2259,8 @@ See `markdown-wiki-link-p'."
 (defun markdown-fontify-region-wiki-links (from to)
   "Search region given by FROM and TO for wiki links and fontify them.
 If a wiki link is found check to see if the backing file exists
-and highlight accordingly."
+and highlight accordingly. Checking for the backing file is done using
+`markdown-linked-file-exists-p'"
   (goto-char from)
   (while (re-search-forward markdown-regex-wiki-link to t)
     (let ((highlight-beginning (match-beginning 0))
@@ -2243,7 +2268,7 @@ and highlight accordingly."
 	  (file-name
 	   (markdown-convert-wiki-link-to-filename
             (markdown-wiki-link-link))))
-      (if (file-exists-p file-name)
+      (if (markdown-linked-file-exists-p file-name)
 	  (markdown-highlight-wiki-link
 	   highlight-beginning highlight-end markdown-link-face)
 	(markdown-highlight-wiki-link
