@@ -555,7 +555,7 @@ This will not take effect until Emacs is restarted."
   :group 'ikiwiki
   :type 'string)
 
-(defcustom ikiwiki-browse-extensions (".mdwn")
+(defcustom ikiwiki-browse-extensions '(".mdwn")
   "Extension used for ikiwiki files when browsing the wiki."
   :group 'ikiwiki
   :type 'list)
@@ -2114,7 +2114,15 @@ with the extension removed and replaced with .html."
 files having an extension in `ikiwiki-browse-extensions' are
 displayed in the buffer."
   (interactive (list ikiwiki-toplevel))
-  )
+  (let ( (browserbuf (get-buffer-create "*IkiwikiBrowser*"))
+	 (files (directory-files ikiwiki-toplevel nil ".*"))
+	 )
+    (save-excursion
+      (set-buffer browserbuf)
+      (insert (mapconcat 'identity files "\n"))
+      (setq buffer-read-only t)
+    )
+    (switch-to-buffer browserbuf)))
 
 
 ;; examples
