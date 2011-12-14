@@ -492,10 +492,6 @@ buffers which are visiting a file."
   :group 'markdown
   :type 'boolean)
 
-(defcustom markdown-ikiwiki-toplevel nil
-  "Path to main ikiwiki-directory."
-  :group 'markdown
-  :type 'string)
 
 (defcustom markdown-wiki-link-alias-first t
   "When non-nil, treat aliased wiki links like [[alias text|PageName]].
@@ -545,6 +541,24 @@ This will not take effect until Emacs is restarted."
   :type '(choice (const :tag "At the end of the document" end)
 		 (const :tag "Immediately after the paragraph" immediately)
 		 (const :tag "Before next header" header)))
+
+;;; Ikiwiki customization  ==================================================
+
+(defgroup ikiwiki nil
+  "Major mode for editing ikiwiki files in Markdown format."
+  :prefix "ikiwiki-"
+  :group 'wp
+  :link '(url-link "http://ihrke.github.com/markdown-mode/"))
+
+(defcustom ikiwiki-toplevel nil
+  "Path to main ikiwiki-directory."
+  :group 'ikiwiki
+  :type 'string)
+
+(defcustom ikiwiki-browse-extensions (".mdwn")
+  "Extension used for ikiwiki files when browsing the wiki."
+  :group 'ikiwiki
+  :type 'list)
 
 ;;; Font lock =================================================================
 
@@ -2094,6 +2108,19 @@ with the extension removed and replaced with .html."
   (interactive)
   (browse-url (markdown-export)))
 
+
+(defun ikiwiki-browse-wiki (path)
+  "Browse the structure of `ikiwiki-toplevel' directory. All
+files having an extension in `ikiwiki-browse-extensions' are
+displayed in the buffer."
+  (interactive (list ikiwiki-toplevel))
+  )
+
+
+;; examples
+;(directory-files "." t (concat ".+\\(" (mapconcat 'identity '("mdwn" "text" "markdown") "\\|") "\\)$"))
+;(directory-files "." t ".+\\(mdwn\\|text\\|markdown\\)$")
+
 ;;; WikiLink Following/Markup =================================================
 
 (require 'thingatpt)
@@ -2106,14 +2133,14 @@ returned by `match-data'.  Note that the potential wiki link name must
 be available via `match-string'."
   (let ((case-fold-search nil))
     (and (thing-at-point-looking-at (if (eq major-mode 'ikiwiki-mode) 
-													 markdown-regex-wiki-link-ikiwiki
-												  markdown-regex-wiki-link))
-			(or (not buffer-file-name)
-				 (not (string-equal (buffer-file-name)
-										  (markdown-convert-wiki-link-to-filename
-											(markdown-wiki-link-link)))))
-			(not (save-match-data
-					 (save-excursion))))))
+					markdown-regex-wiki-link-ikiwiki
+				      markdown-regex-wiki-link))
+	 (or (not buffer-file-name)
+	     (not (string-equal (buffer-file-name)
+				(markdown-convert-wiki-link-to-filename
+				 (markdown-wiki-link-link)))))
+	 (not (save-match-data
+		(save-excursion))))))
 
 (defun markdown-wiki-link-link ()
   "Return the link part of the wiki link using current match data.
@@ -2163,23 +2190,23 @@ possibly creating directories. Used in conjunction with
 `markdown-follow-wiki-link-at-point-ikiwiki' to allow opening
 files in different locations."
   (interactive (list 
-					 (read-string 
-					  "File: "  
-					  (concat 
-						(file-name-as-directory (file-name-sans-extension (buffer-name)))
-						(markdown-convert-wiki-link-to-filename 
-						 (markdown-wiki-link-link))))))
+		(read-string 
+		 "File: "  
+		 (concat 
+		  (file-name-as-directory (file-name-sans-extension (buffer-name)))
+		  (markdown-convert-wiki-link-to-filename 
+		   (markdown-wiki-link-link))))))
   (let ( (dir (file-name-directory file)) )
-	 (if dir (make-directory (file-name-directory file) t) )
-	 (find-file file)
-	 (message "filename is %s" file)) )
+    (if dir (make-directory (file-name-directory file) t) )
+    (find-file file)
+    (message "filename is %s" file)) )
 
 (defun markdown-linked-file-exists-p (file &optional LOCATION)
   "Check if file exists in different possible locations. 
 Returns the full file name or nil.
 
 LOCATION can be one of 'toplevel', 'cwd' or 'subdir'
-corresponding to `markdown-ikiwiki-toplevel', the current working
+corresponding to `ikiwiki-toplevel', the current working
 directory and a subdirectory of the same name as
 the (extensionless) `buffer-name'. If nil, all three locations are checked.
 
@@ -2187,23 +2214,23 @@ This behaviour is only used when in `ikiwiki-mode'. Else, it is
 identical to `file-exists-p'.
 "
   (if (eq major-mode 'ikiwiki-mode)
-		(if (and (or (not LOCATION) (string= LOCATION "toplevel")) 
-					markdown-ikiwiki-toplevel
-					(file-exists-p (setq fullfile 
-												(concat (file-name-as-directory
-								 markdown-ikiwiki-toplevel) file))))
-			 fullfile
-		  (if (and (or (not LOCATION) (string= LOCATION "cwd"))
-					  (file-exists-p file)) file
-			 (if (and (or (not LOCATION) (string= LOCATION "subdir"))
-						 (file-exists-p 
-						  (setq fullfile
-								  (concat (file-name-as-directory 
-											  (file-name-sans-extension (buffer-name)))
-											 file ))))
-				  fullfile
-				nil)))
-	 (file-exists-p file) ))
+      (if (and (or (not LOCATION) (string= LOCATION "toplevel")) 
+	       ikiwiki-toplevel
+	       (file-exists-p (setq fullfile 
+				    (concat (file-name-as-directory
+					     ikiwiki-toplevel) file))))
+	  fullfile
+	(if (and (or (not LOCATION) (string= LOCATION "cwd"))
+		 (file-exists-p file)) file
+	  (if (and (or (not LOCATION) (string= LOCATION "subdir"))
+		   (file-exists-p 
+		    (setq fullfile
+			  (concat (file-name-as-directory 
+				   (file-name-sans-extension (buffer-name)))
+				  file ))))
+	      fullfile
+	    nil)))
+    (file-exists-p file) ))
 
 
 (defun markdown-follow-wiki-link-at-point-ikiwiki (option)
@@ -2213,34 +2240,34 @@ b) files in the current working directory
 c) files in a subdirectory of the name of the current page.
 When calling the current function, the user is prompted as to in
 which of the three locations he wishes to create/visit the file.
-For the top-level option, the variable `markdown-ikiwiki-toplevel' 
+For the top-level option, the variable `ikiwiki-toplevel' 
 needs to be set. Default is (b)."
   (interactive (list (read-char 
-							 (let ( (a (if markdown-ikiwiki-toplevel "(a) top-level " nil))
-									  (b "(b) current dir ")
-									  (c "(c) subdir of current page ")
-									  (file (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link))))
-								(if (and a (markdown-linked-file-exists-p file "toplevel"))
-									 (put-text-property 0 (length a) 'face 'markdown-link-face a)
-								  (put-text-property 0 (length a) 'face 'markdown-missing-link-face a) )
-								(if (markdown-linked-file-exists-p file "cwd")
-									 (put-text-property 0 (length b) 'face 'markdown-link-face b)
-								  (put-text-property 0 (length b) 'face 'markdown-missing-link-face b) )
-								(if (markdown-linked-file-exists-p file "subdir") 
-									 (put-text-property 0 (length c) 'face 'markdown-link-face c)
-								  (put-text-property 0 (length c) 'face 'markdown-missing-link-face c) )
-								(concat a (if a "\t|\t") b "\t|\t" c )))))
+		      (let ( (a (if ikiwiki-toplevel "(a) top-level " nil))
+			     (b "(b) current dir ")
+			     (c "(c) subdir of current page ")
+			     (file (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link))))
+			(if (and a (markdown-linked-file-exists-p file "toplevel"))
+			    (put-text-property 0 (length a) 'face 'markdown-link-face a)
+			  (put-text-property 0 (length a) 'face 'markdown-missing-link-face a) )
+			(if (markdown-linked-file-exists-p file "cwd")
+			    (put-text-property 0 (length b) 'face 'markdown-link-face b)
+			  (put-text-property 0 (length b) 'face 'markdown-missing-link-face b) )
+			(if (markdown-linked-file-exists-p file "subdir") 
+			    (put-text-property 0 (length c) 'face 'markdown-link-face c)
+			  (put-text-property 0 (length c) 'face 'markdown-missing-link-face c) )
+			(concat a (if a "\t|\t") b "\t|\t" c )))))
   (let* ((opt (char-to-string option)) 
-			(filename (if (and markdown-ikiwiki-toplevel (string= opt "a"))
-							  (concat (file-name-as-directory markdown-ikiwiki-toplevel)
-										 (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link)))
-							(if (string= opt "c")
-								 (concat (file-name-as-directory (file-name-sans-extension (buffer-name)))
-											(markdown-convert-wiki-link-to-filename 
-											 (markdown-wiki-link-link)) )
-							  (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link))))))
-	 (message "filename is %s" filename) 
-	 (markdown-follow-wiki-link-file filename)))
+	 (filename (if (and ikiwiki-toplevel (string= opt "a"))
+		       (concat (file-name-as-directory ikiwiki-toplevel)
+			       (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link)))
+		     (if (string= opt "c")
+			 (concat (file-name-as-directory (file-name-sans-extension (buffer-name)))
+				 (markdown-convert-wiki-link-to-filename 
+				  (markdown-wiki-link-link)) )
+		       (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link))))))
+    (message "filename is %s" filename) 
+    (markdown-follow-wiki-link-file filename)))
 
 
 (defun markdown-next-wiki-link ()
