@@ -555,6 +555,16 @@ This will not take effect until Emacs is restarted."
   :group 'ikiwiki
   :type 'string)
 
+(defcustom ikiwiki-executable "ikiwiki"
+  "Path to ikiwiki-executable."
+  :group 'ikiwiki
+  :type 'string)
+
+(defcustom ikiwiki-setup-file nil
+  "Path to setup file for your ikiwiki (required for previewing)."
+  :group 'ikiwiki
+  :type 'string)
+
 (defcustom ikiwiki-browse-extensions '(".mdwn")
   "Extension used for ikiwiki files when browsing the wiki."
   :group 'ikiwiki
@@ -1742,6 +1752,11 @@ it in the usual way."
     ["Version" markdown-show-version]
     ))
 
+(easy-menu-define ikiwiki-mode-menu markdown-mode-map
+  "Menu for Ikiwiki mode"
+  '("Ikiwiki" 
+	 ["Render" ikiwiki-preview]))
+
 
 
 ;;; References ================================================================
@@ -2108,6 +2123,19 @@ with the extension removed and replaced with .html."
   (interactive)
   (browse-url (markdown-export)))
 
+(defun ikiwiki-preview ()
+  "Render the current buffer with ikiwiki in a special buffer and browse with webbrowser."
+  (interactive)
+  
+  (let ((output-buffer-name "*IkiwikiRendered*"))
+	 (if ikiwiki-setup-file
+		  (progn 
+			 (shell-command (concat ikiwiki-executable " --setup " 
+											ikiwiki-setup-file " --render "
+											(shell-quote-argument buffer-file-name))
+								 output-buffer-name)
+			 (browse-url-of-buffer output-buffer-name))
+		(message "Error: need ikiwiki-setup-file"))))
 
 (defun ikiwiki-browse-wiki (path)
   "Browse the structure of `ikiwiki-toplevel' directory. All
@@ -2488,6 +2516,8 @@ This is an exact copy of `line-number-at-pos' for use in emacs21."
 (define-derived-mode ikiwiki-mode markdown-mode "MarkdownIki"
   "Major mode for editing Ikiwiki Markdown files."
   (message "Loading ikiwiki-mode")
+
+  (easy-menu-add ikiwiki-mode-menu markdown-mode-map)
 
   ;; Font lock.
   (setq markdown-mode-font-lock-keywords 
