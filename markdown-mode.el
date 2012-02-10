@@ -565,7 +565,7 @@ This will not take effect until Emacs is restarted."
   :group 'ikiwiki
   :type 'string)
 
-(defcustom ikiwiki-browse-extensions '(".mdwn")
+(defcustom ikiwiki-browse-extensions '("mdwn" "markdown")
   "Extension used for ikiwiki files when browsing the wiki."
   :group 'ikiwiki
   :type 'list)
@@ -2124,7 +2124,7 @@ with the extension removed and replaced with .html."
   (browse-url (markdown-export)))
 
 (defun ikiwiki-preview ()
-  "Render the current buffer with ikiwiki in a special buffer and browse with webbrowser."
+  "Render the current buffer with ikiwiki in a special buffer and browse with web browser."
   (interactive)
   
   (let ((output-buffer-name "*IkiwikiRendered*"))
@@ -2137,18 +2137,48 @@ with the extension removed and replaced with .html."
 			 (browse-url-of-buffer output-buffer-name))
 		(message "Error: need ikiwiki-setup-file"))))
 
-(defun ikiwiki-browse-wiki (path)
+(defun kill-current-buffer()
+  "Kills the current buffer."
+  (interactive)
+  (kill-buffer nil))
+
+(defun ikiwiki-browse-wiki-at-point ()
+  ""
+  (interactive)
+  (let ((where (thing-at-point 'line)))
+	 (message "Where: %s" where)
+	 (kill-buffer "*IkiwikiBrowser*")
+													 ;(delete-region 0 (buffer-size))
+	 (ikiwiki-browse-wiki (concat (file-name-as-directory ikiwiki-toplevel) where))
+	 )
+)
+
+(defun ikiwiki-browse-wiki (&optional browsepath)
   "Browse the structure of `ikiwiki-toplevel' directory. All
 files having an extension in `ikiwiki-browse-extensions' are
 displayed in the buffer."
-  (interactive (list ikiwiki-toplevel))
-  (let ( (browserbuf (get-buffer-create "*IkiwikiBrowser*"))
-	 (files (directory-files ikiwiki-toplevel nil ".*"))
-	 )
+  (interactive)
+  (let* ( (path (if browsepath browsepath ikiwiki-toplevel)) 
+			 (browserbuf (get-buffer-create "*IkiwikiBrowser*"))
+			 (fileregexp (concat ".+\\.\\(" (mapconcat 'identity ikiwiki-browse-extensions "\\|") "\\\)$"))
+			(files (directory-files path nil fileregexp t)) 
+			)
+	 (message "Browsing at path: %s" path)
     (save-excursion
       (set-buffer browserbuf)
-      (insert (mapconcat 'identity files "\n"))
+		(insert (concat fileregexp "\n"))
+		(dolist (curf files)
+		  (let ( (start (point))
+					(f (file-name-sans-extension curf)))
+			 (insert (concat f "\n"))
+			 (if (file-exists-p (concat (file-name-as-directory path) f))
+				  (put-text-property start (point) 'face 'markdown-bold-face)
+				(put-text-property start (point) 'face 'markdown-link-face)
+				)
+		  ))
       (setq buffer-read-only t)
+		(local-set-key "q" 'kill-current-buffer)
+		(local-set-key "\C-m" 'ikiwiki-browse-wiki-at-point)
     )
     (switch-to-buffer browserbuf)))
 
