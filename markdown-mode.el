@@ -570,6 +570,12 @@ This will not take effect until Emacs is restarted."
   :group 'ikiwiki
   :type 'list)
 
+(defcustom ikiwiki-browser-buffer-name "*IkiwikiBrowser*"
+  "Name for the ikiwiki-browser buffer."
+  :group 'ikiwiki
+  :type 'string)
+
+
 ;;; Font lock =================================================================
 
 (require 'font-lock)
@@ -946,7 +952,7 @@ these are ikiwiki-directives.")
 (defvar markdown-mode-font-lock-keywords
   (append
    (if markdown-enable-math
-       markdown-mode-font-lock-keywords-latex)h
+       markdown-mode-font-lock-keywords-latex)
    markdown-mode-font-lock-keywords-basic)
   "Default highlighting expressions for Markdown mode.")
 
@@ -2168,13 +2174,13 @@ pages in a directory tree for browsing."
 (defun ikiwiki-browser-open-page-at-point ()
   "In the ikiwiki-browser, open the page under the cursor, if any."
   (interactive)
-  (let ( (page (replace-regexp-in-string
-					 "[ \t]*"
-					 ""
-					 (thing-at-point 'line)) ))
-	 (message "pagename=%s" page)
-	 )
-  )
+  (if (string= (current-buffer) ikiwiki-browser-buffer-name)
+		(let ( (page (replace-regexp-in-string
+						  "[ \t]*"
+						  ""
+						  (thing-at-point 'line)) ))
+		  (message "pagename=%s" page)
+		  ) ))
 
 (defun ikiwiki-browse-wiki (&optional browsepath)
   "Browse the structure of `ikiwiki-toplevel' directory. All
@@ -2182,7 +2188,7 @@ files having an extension in `ikiwiki-browse-extensions' are
 displayed in the buffer."
   (interactive)
   (let* ( (path (if browsepath browsepath ikiwiki-toplevel)) 
-			 (browserbuf (get-buffer-create "*IkiwikiBrowser*"))
+			 (browserbuf (get-buffer-create ikiwiki-browser-buffer-name ))
 			)
     (save-excursion
       (set-buffer browserbuf)
