@@ -1,0 +1,6 @@
+--- !ditz.rubyforge.org,2008-03-06/config 
+name: Matthias Ihrke
+email: ihrke@cotopaxi
+issue_dir: .ditz
+use_editor_if_possible: false
+paginate: never

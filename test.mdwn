@@ -1,0 +1,24 @@
+## hallo ##
+
+[[hallo]] 
+
+## [[hallo]] ##
+
+## [[test]] ##
+
+## [[test]] ##
+
+## [[test]] ##
+
+[[!map pages=*]]
+
+
+(setq ikiwiki-setup-file "/home/ihrke/work/admin/conf/iki/researchwiki.setup")
+(setq ikiwiki-toplevel "/home/ihrke/work/researchwiki/")
+(setq ikiwiki-browse-extensions '("mdwn" "markdown"))
+(setq ikiwiki-setup-file nil)
+
+
+[[!bibtex key="test"]]
+ (mapconcat 'identity ikiwiki-browse-extensions "|")
+(directory-files "." t (concat ".+\\(" (mapconcat 'identity '("mdwn" "text" "markdown") "\\|") "\\)$"))
