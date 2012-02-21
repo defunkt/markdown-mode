@@ -1755,9 +1755,9 @@ it in the usual way."
 (easy-menu-define ikiwiki-mode-menu markdown-mode-map
   "Menu for Ikiwiki mode"
   '("Ikiwiki" 
-	 ["Render" ikiwiki-preview]))
-
-
+	 ["Render" ikiwiki-preview]
+	 ["Browse Ikiwiki" ikiwiki-browse-wiki]) 
+  )
 
 ;;; References ================================================================
 
@@ -2142,15 +2142,26 @@ with the extension removed and replaced with .html."
   (interactive)
   (kill-buffer nil))
 
-(defun ikiwiki-browse-wiki-at-point ()
-  ""
-  (interactive)
-  (let ((where (thing-at-point 'line)))
-	 (message "Where: %s" where)
-	 (kill-buffer "*IkiwikiBrowser*")
-													 ;(delete-region 0 (buffer-size))
-	 (ikiwiki-browse-wiki (concat (file-name-as-directory ikiwiki-toplevel) where))
-	 )
+
+(defun ikiwiki-browser-walk-tree-insert-pages ( path indent )
+  "Assuming you are in the browser-buffer."
+  (message "called with path: %s and indent= %i" path indent)
+  (let* ( (fileregexp 
+			  (concat ".+\\.\\(" (mapconcat 'identity ikiwiki-browse-extensions "\\|") "\\\)$"))
+			 (files (directory-files path nil fileregexp)))
+	 (dolist (curf files)
+		(let* ( (start (point))
+				 (f (file-name-sans-extension curf))
+				 (fpath (concat (file-name-as-directory path) f))
+				 )
+		  (insert (make-string indent 32)) ; space
+		  (insert (concat f "\n"))
+		  (if (file-exists-p fpath)
+				(list 
+				 (put-text-property start (point) 'face 'markdown-bold-face)
+				 (ikiwiki-browser-walk-tree-insert-pages fpath (+ indent 3)) )
+			 (put-text-property start (point) 'face 'markdown-link-face) )
+		  )))
 )
 
 (defun ikiwiki-browse-wiki (&optional browsepath)
@@ -2160,32 +2171,15 @@ displayed in the buffer."
   (interactive)
   (let* ( (path (if browsepath browsepath ikiwiki-toplevel)) 
 			 (browserbuf (get-buffer-create "*IkiwikiBrowser*"))
-			 (fileregexp (concat ".+\\.\\(" (mapconcat 'identity ikiwiki-browse-extensions "\\|") "\\\)$"))
-			(files (directory-files path nil fileregexp t)) 
 			)
-	 (message "Browsing at path: %s" path)
     (save-excursion
       (set-buffer browserbuf)
-		(insert (concat fileregexp "\n"))
-		(dolist (curf files)
-		  (let ( (start (point))
-					(f (file-name-sans-extension curf)))
-			 (insert (concat f "\n"))
-			 (if (file-exists-p (concat (file-name-as-directory path) f))
-				  (put-text-property start (point) 'face 'markdown-bold-face)
-				(put-text-property start (point) 'face 'markdown-link-face)
-				)
-		  ))
+		(ikiwiki-browser-walk-tree-insert-pages path 0)
       (setq buffer-read-only t)
 		(local-set-key "q" 'kill-current-buffer)
-		(local-set-key "\C-m" 'ikiwiki-browse-wiki-at-point)
+		;(local-set-key "\C-m" 'ikiwiki-browse-wiki-at-point)
     )
     (switch-to-buffer browserbuf)))
-
-
-;; examples
-;(directory-files "." t (concat ".+\\(" (mapconcat 'identity '("mdwn" "text" "markdown") "\\|") "\\)$"))
-;(directory-files "." t ".+\\(mdwn\\|text\\|markdown\\)$")
 
 ;;; WikiLink Following/Markup =================================================
 
