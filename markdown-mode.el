@@ -946,7 +946,7 @@ these are ikiwiki-directives.")
 (defvar markdown-mode-font-lock-keywords
   (append
    (if markdown-enable-math
-       markdown-mode-font-lock-keywords-latex)
+       markdown-mode-font-lock-keywords-latex)h
    markdown-mode-font-lock-keywords-basic)
   "Default highlighting expressions for Markdown mode.")
 
@@ -2144,7 +2144,8 @@ with the extension removed and replaced with .html."
 
 
 (defun ikiwiki-browser-walk-tree-insert-pages ( path indent )
-  "Assuming you are in the browser-buffer."
+  "Assuming you are in the browser-buffer, walk path and insert
+pages in a directory tree for browsing."
   (message "called with path: %s and indent= %i" path indent)
   (let* ( (fileregexp 
 			  (concat ".+\\.\\(" (mapconcat 'identity ikiwiki-browse-extensions "\\|") "\\\)$"))
@@ -2164,6 +2165,17 @@ with the extension removed and replaced with .html."
 		  )))
 )
 
+(defun ikiwiki-browser-open-page-at-point ()
+  "In the ikiwiki-browser, open the page under the cursor, if any."
+  (interactive)
+  (let ( (page (replace-regexp-in-string
+					 "[ \t]*"
+					 ""
+					 (thing-at-point 'line)) ))
+	 (message "pagename=%s" page)
+	 )
+  )
+
 (defun ikiwiki-browse-wiki (&optional browsepath)
   "Browse the structure of `ikiwiki-toplevel' directory. All
 files having an extension in `ikiwiki-browse-extensions' are
@@ -2177,7 +2189,8 @@ displayed in the buffer."
 		(ikiwiki-browser-walk-tree-insert-pages path 0)
       (setq buffer-read-only t)
 		(local-set-key "q" 'kill-current-buffer)
-		;(local-set-key "\C-m" 'ikiwiki-browse-wiki-at-point)
+		(local-set-key "\C-m" 'ikiwiki-browser-open-page-at-point)
+		(goto-char (point-min))
     )
     (switch-to-buffer browserbuf)))
 
