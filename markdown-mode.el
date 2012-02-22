@@ -2151,22 +2151,26 @@ with the extension removed and replaced with .html."
 
 (defun ikiwiki-browser-walk-tree-insert-pages ( path indent )
   "Assuming you are in the browser-buffer, walk path and insert
-pages in a directory tree for browsing."
-  (message "called with path: %s and indent= %i" path indent)
+pages in a directory tree for browsing.
+
+Storing the full path of each file in the help-echo text-property.
+"
   (let* ( (fileregexp 
 			  (concat ".+\\.\\(" (mapconcat 'identity ikiwiki-browse-extensions "\\|") "\\\)$"))
 			 (files (directory-files path nil fileregexp)))
 	 (dolist (curf files)
 		(let* ( (start (point))
 				 (f (file-name-sans-extension curf))
-				 (fpath (concat (file-name-as-directory path) f))
+				 (fpath (concat (file-name-as-directory path) curf))
+				 (dpath (concat (file-name-as-directory path) f))
 				 )
 		  (insert (make-string indent 32)) ; space
 		  (insert (concat f "\n"))
-		  (if (file-exists-p fpath)
+		  (put-text-property start (point) 'help-echo fpath)
+		  (if (file-exists-p dpath)
 				(list 
 				 (put-text-property start (point) 'face 'markdown-bold-face)
-				 (ikiwiki-browser-walk-tree-insert-pages fpath (+ indent 3)) )
+				 (ikiwiki-browser-walk-tree-insert-pages dpath (+ indent 3)) )
 			 (put-text-property start (point) 'face 'markdown-link-face) )
 		  )))
 )
@@ -2174,12 +2178,13 @@ pages in a directory tree for browsing."
 (defun ikiwiki-browser-open-page-at-point ()
   "In the ikiwiki-browser, open the page under the cursor, if any."
   (interactive)
-  (if (string= (current-buffer) ikiwiki-browser-buffer-name)
+  (if (string= (buffer-name) ikiwiki-browser-buffer-name)
 		(let ( (page (replace-regexp-in-string
 						  "[ \t]*"
 						  ""
-						  (thing-at-point 'line)) ))
-		  (message "pagename=%s" page)
+						  (thing-at-point 'line)) )
+				 (hecho (get-text-property (point) 'help-echo)))
+		  (find-file hecho)
 		  ) ))
 
 (defun ikiwiki-browse-wiki (&optional browsepath)
