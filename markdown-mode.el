@@ -492,6 +492,7 @@ buffers which are visiting a file."
   :group 'markdown
   :type 'boolean)
 
+
 (defcustom markdown-wiki-link-alias-first t
   "When non-nil, treat aliased wiki links like [[alias text|PageName]].
 Otherwise, they will be treated as [[PageName|alias text]]."
@@ -541,6 +542,40 @@ This will not take effect until Emacs is restarted."
 		 (const :tag "Immediately after the paragraph" immediately)
 		 (const :tag "Before next header" header)))
 
+;;; Ikiwiki customization  ==================================================
+
+(defgroup ikiwiki nil
+  "Major mode for editing ikiwiki files in Markdown format."
+  :prefix "ikiwiki-"
+  :group 'wp
+  :link '(url-link "http://ihrke.github.com/markdown-mode/"))
+
+(defcustom ikiwiki-toplevel nil
+  "Path to main ikiwiki-directory."
+  :group 'ikiwiki
+  :type 'string)
+
+(defcustom ikiwiki-executable "ikiwiki"
+  "Path to ikiwiki-executable."
+  :group 'ikiwiki
+  :type 'string)
+
+(defcustom ikiwiki-setup-file nil
+  "Path to setup file for your ikiwiki (required for previewing)."
+  :group 'ikiwiki
+  :type 'string)
+
+(defcustom ikiwiki-browse-extensions '("mdwn" "markdown")
+  "Extension used for ikiwiki files when browsing the wiki."
+  :group 'ikiwiki
+  :type 'list)
+
+(defcustom ikiwiki-browser-buffer-name "*IkiwikiBrowser*"
+  "Name for the ikiwiki-browser buffer."
+  :group 'ikiwiki
+  :type 'string)
+
+
 ;;; Font lock =================================================================
 
 (require 'font-lock)
@@ -589,6 +624,9 @@ This will not take effect until Emacs is restarted."
 
 (defvar markdown-missing-link-face 'markdown-missing-link-face
   "Face name to use for links where the linked file does not exist.")
+
+(defvar markdown-ikiwiki-directive-face 'markdown-ikiwiki-directive-face
+  "Face name to use for ikiwiki-directives.")
 
 (defvar markdown-reference-face 'markdown-reference-face
   "Face name to use for reference.")
@@ -686,6 +724,11 @@ This will not take effect until Emacs is restarted."
 (defface markdown-missing-link-face
   '((t (:inherit font-lock-warning-face)))
   "Face for missing links."
+  :group 'markdown-faces)
+
+(defface markdown-ikiwiki-directive-face
+  '((t (:inherit font-lock-warning-face :weight normal)))
+  "Face for ikiwiki-directives."
   :group 'markdown-faces)
 
 (defface markdown-reference-face
@@ -810,6 +853,18 @@ wiki links of the form [[PageName|link text]].  In this regular
 expression, #1 matches the page name and #3 matches the link
 text.")
 
+(defconst markdown-regex-wiki-link-ikiwiki
+  "\\[\\[\\([^!][^]|]+\\)\\(|\\([^]]+\\)\\)?\\]\\]"
+  "Regular expression for matching wiki links.
+Similar to `markdown-regex-wiki-link' except, that 
+links beginning with '!' are not matched (because
+these are ikiwiki-directives.")
+
+(defconst markdown-regex-ikiwiki-directive
+  "\\[\\[![^]]+?\\]\\]"
+  "Regular expression for matching ikiwiki directives of the form
+[[!command param1='test']].")
+
 (defconst markdown-regex-uri
   (concat
    "\\(" (mapconcat 'identity markdown-uri-types "\\|")
@@ -886,6 +941,13 @@ text.")
    ;; Equation reference \eqref{foo}
    (cons "\\\\eqref{\\w+}" 'markdown-reference-face))
   "Syntax highlighting for LaTeX fragments.")
+
+(defconst markdown-mode-font-lock-keywords-ikiwiki
+  (list
+   ;; directive [[!command ]]
+   (cons markdown-regex-ikiwiki-directive
+			'markdown-ikiwiki-directive-face))
+  "Syntax highlighting for Ikiwiki-specific statements.")
 
 (defvar markdown-mode-font-lock-keywords
   (append
@@ -1590,6 +1652,7 @@ it in the usual way."
       (markdown-follow-wiki-link-at-point)
     (markdown-do-normal-return)))
 
+
 
 
 ;;; Keymap ====================================================================
@@ -1695,7 +1758,12 @@ it in the usual way."
     ["Version" markdown-show-version]
     ))
 
-
+(easy-menu-define ikiwiki-mode-menu markdown-mode-map
+  "Menu for Ikiwiki mode"
+  '("Ikiwiki" 
+	 ["Render" ikiwiki-preview]
+	 ["Browse Ikiwiki" ikiwiki-browse-wiki]) 
+  )
 
 ;;; References ================================================================
 
@@ -2061,6 +2129,82 @@ with the extension removed and replaced with .html."
   (interactive)
   (browse-url (markdown-export)))
 
+(defun ikiwiki-preview ()
+  "Render the current buffer with ikiwiki in a special buffer and browse with web browser."
+  (interactive)
+  
+  (let ((output-buffer-name "*IkiwikiRendered*"))
+	 (if ikiwiki-setup-file
+		  (progn 
+			 (shell-command (concat ikiwiki-executable " --setup " 
+											ikiwiki-setup-file " --render "
+											(shell-quote-argument buffer-file-name))
+								 output-buffer-name)
+			 (browse-url-of-buffer output-buffer-name))
+		(message "Error: need ikiwiki-setup-file"))))
+
+(defun kill-current-buffer()
+  "Kills the current buffer."
+  (interactive)
+  (kill-buffer nil))
+
+
+(defun ikiwiki-browser-walk-tree-insert-pages ( path indent )
+  "Assuming you are in the browser-buffer, walk path and insert
+pages in a directory tree for browsing.
+
+Storing the full path of each file in the help-echo text-property.
+"
+  (let* ( (fileregexp 
+			  (concat ".+\\.\\(" (mapconcat 'identity ikiwiki-browse-extensions "\\|") "\\\)$"))
+			 (files (directory-files path nil fileregexp)))
+	 (dolist (curf files)
+		(let* ( (start (point))
+				 (f (file-name-sans-extension curf))
+				 (fpath (concat (file-name-as-directory path) curf))
+				 (dpath (concat (file-name-as-directory path) f))
+				 )
+		  (insert (make-string indent 32)) ; space
+		  (insert (concat f "\n"))
+		  (put-text-property start (point) 'help-echo fpath)
+		  (if (file-exists-p dpath)
+				(list 
+				 (put-text-property start (point) 'face 'markdown-bold-face)
+				 (ikiwiki-browser-walk-tree-insert-pages dpath (+ indent 3)) )
+			 (put-text-property start (point) 'face 'markdown-link-face) )
+		  )))
+)
+
+(defun ikiwiki-browser-open-page-at-point ()
+  "In the ikiwiki-browser, open the page under the cursor, if any."
+  (interactive)
+  (if (string= (buffer-name) ikiwiki-browser-buffer-name)
+		(let ( (page (replace-regexp-in-string
+						  "[ \t]*"
+						  ""
+						  (thing-at-point 'line)) )
+				 (hecho (get-text-property (point) 'help-echo)))
+		  (find-file hecho)
+		  ) ))
+
+(defun ikiwiki-browse-wiki (&optional browsepath)
+  "Browse the structure of `ikiwiki-toplevel' directory. All
+files having an extension in `ikiwiki-browse-extensions' are
+displayed in the buffer."
+  (interactive)
+  (let* ( (path (if browsepath browsepath ikiwiki-toplevel)) 
+			 (browserbuf (get-buffer-create ikiwiki-browser-buffer-name ))
+			)
+    (save-excursion
+      (set-buffer browserbuf)
+		(ikiwiki-browser-walk-tree-insert-pages path 0)
+      (setq buffer-read-only t)
+		(local-set-key "q" 'kill-current-buffer)
+		(local-set-key "\C-m" 'ikiwiki-browser-open-page-at-point)
+		(goto-char (point-min))
+    )
+    (switch-to-buffer browserbuf)))
+
 ;;; WikiLink Following/Markup =================================================
 
 (require 'thingatpt)
@@ -2072,11 +2216,13 @@ match the current file name after conversion.  This modifies the data
 returned by `match-data'.  Note that the potential wiki link name must
 be available via `match-string'."
   (let ((case-fold-search nil))
-    (and (thing-at-point-looking-at markdown-regex-wiki-link)
+    (and (thing-at-point-looking-at (if (eq major-mode 'ikiwiki-mode) 
+					markdown-regex-wiki-link-ikiwiki
+				      markdown-regex-wiki-link))
 	 (or (not buffer-file-name)
 	     (not (string-equal (buffer-file-name)
 				(markdown-convert-wiki-link-to-filename
-                                 (markdown-wiki-link-link)))))
+				 (markdown-wiki-link-link)))))
 	 (not (save-match-data
 		(save-excursion))))))
 
@@ -2105,19 +2251,108 @@ and [[test test]] both map to Test-test.ext."
 
 (defun markdown-follow-wiki-link (name)
   "Follow the wiki link NAME.
-Convert the name to a file name and call `find-file'.  Ensure that
-the new buffer remains in `markdown-mode'."
+Convert the name to a file name and call `find-file'."
   (let ((filename (markdown-convert-wiki-link-to-filename name)))
-    (find-file filename))
-  (markdown-mode))
+    (find-file filename)))
+
 
 (defun markdown-follow-wiki-link-at-point ()
   "Find Wiki Link at point.
+In `ikiwiki-mode', ask for location of file, see
+`markdown-follow-wiki-link-at-point-ikiwiki'.  
 See `markdown-wiki-link-p' and `markdown-follow-wiki-link'."
   (interactive)
   (if (markdown-wiki-link-p)
-      (markdown-follow-wiki-link (markdown-wiki-link-link))
+		(if (eq major-mode 'ikiwiki-mode)
+			 (call-interactively 'markdown-follow-wiki-link-at-point-ikiwiki)
+		  (markdown-follow-wiki-link (markdown-wiki-link-link)))
     (error "Point is not at a Wiki Link")))
+
+(defun markdown-follow-wiki-link-file (file)
+  "Given a path, open a new file at this location,
+possibly creating directories. Used in conjunction with
+`markdown-follow-wiki-link-at-point-ikiwiki' to allow opening
+files in different locations."
+  (interactive (list 
+		(read-string 
+		 "File: "  
+		 (concat 
+		  (file-name-as-directory (file-name-sans-extension (buffer-name)))
+		  (markdown-convert-wiki-link-to-filename 
+		   (markdown-wiki-link-link))))))
+  (let ( (dir (file-name-directory file)) )
+    (if dir (make-directory (file-name-directory file) t) )
+    (find-file file)
+    (message "filename is %s" file)) )
+
+(defun markdown-linked-file-exists-p (file &optional LOCATION)
+  "Check if file exists in different possible locations. 
+Returns the full file name or nil.
+
+LOCATION can be one of 'toplevel', 'cwd' or 'subdir'
+corresponding to `ikiwiki-toplevel', the current working
+directory and a subdirectory of the same name as
+the (extensionless) `buffer-name'. If nil, all three locations are checked.
+
+This behaviour is only used when in `ikiwiki-mode'. Else, it is
+identical to `file-exists-p'.
+"
+  (if (eq major-mode 'ikiwiki-mode)
+      (if (and (or (not LOCATION) (string= LOCATION "toplevel")) 
+	       ikiwiki-toplevel
+	       (file-exists-p (setq fullfile 
+				    (concat (file-name-as-directory
+					     ikiwiki-toplevel) file))))
+	  fullfile
+	(if (and (or (not LOCATION) (string= LOCATION "cwd"))
+		 (file-exists-p file)) file
+	  (if (and (or (not LOCATION) (string= LOCATION "subdir"))
+		   (file-exists-p 
+		    (setq fullfile
+			  (concat (file-name-as-directory 
+				   (file-name-sans-extension (buffer-name)))
+				  file ))))
+	      fullfile
+	    nil)))
+    (file-exists-p file) ))
+
+
+(defun markdown-follow-wiki-link-at-point-ikiwiki (option)
+  "In Ikiwiki, [[link]]'s can link to three different files:
+a) files located in the top-level hierarchy of the wiki
+b) files in the current working directory
+c) files in a subdirectory of the name of the current page.
+When calling the current function, the user is prompted as to in
+which of the three locations he wishes to create/visit the file.
+For the top-level option, the variable `ikiwiki-toplevel' 
+needs to be set. Default is (b)."
+  (interactive (list (read-char 
+		      (let ( (a (if ikiwiki-toplevel "(a) top-level " nil))
+			     (b "(b) current dir ")
+			     (c "(c) subdir of current page ")
+			     (file (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link))))
+			(if (and a (markdown-linked-file-exists-p file "toplevel"))
+			    (put-text-property 0 (length a) 'face 'markdown-link-face a)
+			  (put-text-property 0 (length a) 'face 'markdown-missing-link-face a) )
+			(if (markdown-linked-file-exists-p file "cwd")
+			    (put-text-property 0 (length b) 'face 'markdown-link-face b)
+			  (put-text-property 0 (length b) 'face 'markdown-missing-link-face b) )
+			(if (markdown-linked-file-exists-p file "subdir") 
+			    (put-text-property 0 (length c) 'face 'markdown-link-face c)
+			  (put-text-property 0 (length c) 'face 'markdown-missing-link-face c) )
+			(concat a (if a "\t|\t") b "\t|\t" c )))))
+  (let* ((opt (char-to-string option)) 
+	 (filename (if (and ikiwiki-toplevel (string= opt "a"))
+		       (concat (file-name-as-directory ikiwiki-toplevel)
+			       (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link)))
+		     (if (string= opt "c")
+			 (concat (file-name-as-directory (file-name-sans-extension (buffer-name)))
+				 (markdown-convert-wiki-link-to-filename 
+				  (markdown-wiki-link-link)) )
+		       (markdown-convert-wiki-link-to-filename (markdown-wiki-link-link))))))
+    (message "filename is %s" filename) 
+    (markdown-follow-wiki-link-file filename)))
+
 
 (defun markdown-next-wiki-link ()
   "Jump to next wiki link.
@@ -2128,14 +2363,18 @@ See `markdown-wiki-link-p'."
       (goto-char (+ 1 (match-end 0))))
   (save-match-data
     ; Search for the next wiki link and move to the beginning.
-    (re-search-forward markdown-regex-wiki-link nil t)
+    (re-search-forward (if (eq major-mode 'ikiwiki-mode) 
+									markdown-regex-wiki-link-ikiwiki 
+								 markdown-regex-wiki-link) nil t)
     (goto-char (match-beginning 0))))
 
 (defun markdown-previous-wiki-link ()
   "Jump to previous wiki link.
 See `markdown-wiki-link-p'."
   (interactive)
-  (re-search-backward markdown-regex-wiki-link nil t))
+  (re-search-backward (if (eq major-mode 'ikiwiki-mode) 
+								  markdown-regex-wiki-link-ikiwiki 
+								markdown-regex-wiki-link) nil t))
 
 (defun markdown-highlight-wiki-link (from to face)
   "Highlight the wiki link in the region between FROM and TO using FACE."
@@ -2150,15 +2389,18 @@ See `markdown-wiki-link-p'."
 (defun markdown-fontify-region-wiki-links (from to)
   "Search region given by FROM and TO for wiki links and fontify them.
 If a wiki link is found check to see if the backing file exists
-and highlight accordingly."
+and highlight accordingly. Checking for the backing file is done using
+`markdown-linked-file-exists-p'"
   (goto-char from)
-  (while (re-search-forward markdown-regex-wiki-link to t)
+  (while (re-search-forward (if (eq major-mode 'ikiwiki-mode) 
+										  markdown-regex-wiki-link-ikiwiki 
+										markdown-regex-wiki-link) to t)
     (let ((highlight-beginning (match-beginning 0))
 	  (highlight-end (match-end 0))
 	  (file-name
 	   (markdown-convert-wiki-link-to-filename
             (markdown-wiki-link-link))))
-      (if (file-exists-p file-name)
+      (if (markdown-linked-file-exists-p file-name)
 	  (markdown-highlight-wiki-link
 	   highlight-beginning highlight-end markdown-link-face)
 	(markdown-highlight-wiki-link
@@ -2318,6 +2560,25 @@ This is an exact copy of `line-number-at-pos' for use in emacs21."
   ;; do the initial link fontification
   (markdown-fontify-buffer-wiki-links))
 
+;;; Ikiwiki Markdown Mode  ============================================
+(define-derived-mode ikiwiki-mode markdown-mode "MarkdownIki"
+  "Major mode for editing Ikiwiki Markdown files."
+  (message "Loading ikiwiki-mode")
+
+  (easy-menu-add ikiwiki-mode-menu markdown-mode-map)
+
+  ;; Font lock.
+  (setq markdown-mode-font-lock-keywords 
+		  (append markdown-mode-font-lock-keywords-ikiwiki
+					 markdown-mode-font-lock-keywords ))
+  (set (make-local-variable 'font-lock-defaults)
+       '(markdown-mode-font-lock-keywords))
+
+  ;; do the initial link fontification
+  (markdown-fontify-buffer-wiki-links)
+
+;  (add-hook 'after-change-major-mode-hook 'leave-ikiwiki-mode)
+)
 
 (provide 'markdown-mode)
 
