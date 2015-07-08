@@ -1191,31 +1191,31 @@ Group 5 matches the reference label.")
   "Regular expression for a footnote marker [^fn].")
 
 (defconst markdown-regex-header
-  "^\\(?:\\(.+\\)\n\\(=+\\)\\|\\(.+\\)\n\\(-+\\)\\|\\(#+\\)\\s-*\\(.*?\\)\\s-*?\\(#*\\)\\)$"
+  "^\\(?:\\(.+\\)\n\\(=+\\)\\|\\(.+\\)\n\\(-+\\)\\|\\(#+\\)\\s-+\\(.*?\\)\\s-*?\\(#*\\)\\)$"
   "Regexp identifying Markdown headers.")
 
 (defconst markdown-regex-header-1-atx
-  "^\\(#\\)[ \t]*\\(.+?\\)[ \t]*\\(#*\\)$"
+  "^\\(#\\)[ \t]+\\(.+?\\)[ \t]*\\(#*\\)$"
   "Regular expression for level 1 atx-style (hash mark) headers.")
 
 (defconst markdown-regex-header-2-atx
-  "^\\(##\\)[ \t]*\\(.+?\\)[ \t]*\\(#*\\)$"
+  "^\\(##\\)[ \t]+\\(.+?\\)[ \t]*\\(#*\\)$"
   "Regular expression for level 2 atx-style (hash mark) headers.")
 
 (defconst markdown-regex-header-3-atx
-  "^\\(###\\)[ \t]*\\(.+?\\)[ \t]*\\(#*\\)$"
+  "^\\(###\\)[ \t]+\\(.+?\\)[ \t]*\\(#*\\)$"
   "Regular expression for level 3 atx-style (hash mark) headers.")
 
 (defconst markdown-regex-header-4-atx
-  "^\\(####\\)[ \t]*\\(.+?\\)[ \t]*\\(#*\\)$"
+  "^\\(####\\)[ \t]+\\(.+?\\)[ \t]*\\(#*\\)$"
   "Regular expression for level 4 atx-style (hash mark) headers.")
 
 (defconst markdown-regex-header-5-atx
-  "^\\(#####\\)[ \t]*\\(.+?\\)[ \t]*\\(#*\\)$"
+  "^\\(#####\\)[ \t]+\\(.+?\\)[ \t]*\\(#*\\)$"
   "Regular expression for level 5 atx-style (hash mark) headers.")
 
 (defconst markdown-regex-header-6-atx
-  "^\\(######\\)[ \t]*\\(.+?\\)[ \t]*\\(#*\\)$"
+  "^\\(######\\)[ \t]+\\(.+?\\)[ \t]*\\(#*\\)$"
   "Regular expression for level 6 atx-style (hash mark) headers.")
 
 (defconst markdown-regex-header-1-setext
@@ -1253,7 +1253,7 @@ fragment is not a backquote.")
   "Regular expression for matching preformatted text sections.")
 
 (defconst markdown-regex-list
-  "^\\([ \t]*\\)\\([0-9]+\\.\\|[\\*\\+-]\\)\\([ \t]+\\)"
+  "^\\([ \t]*\\)\\([0-9#a-z]+\\.\\|([0-9#a-z]+)\\|[\\*\\+-]\\)\\([ \t]+\\)"
   "Regular expression for matching list items.")
 
 (defconst markdown-regex-bold
@@ -3730,6 +3730,42 @@ defined."
 
 ;;; Lists =====================================================================
 
+;; https://www.gnu.org/software/emacs/manual/html_node/elisp/Mapping-Functions.html#Mapping-Functions
+(defun mapcar-star (function &rest args)
+  "Apply FUNCTION to successive cars of all ARGS.
+          Return the list of results."
+  ;; If no list is exhausted,
+  (if (not (memq nil args))
+      ;; apply function to cars.
+      (cons (apply function (mapcar 'car args))
+            (apply 'mapcar-star function
+                   ;; Recurse for rest of elements.
+                   (mapcar 'cdr args)))))
+
+(defun markdown-increment-letters (s)
+  "'Increment' a character string along lowercase alpha. For
+instance, a increments to b and y to z. Rollover is handled, so z
+rolls to aa, az to ba, etc."
+  (interactive)
+  (let ((num (reverse
+              (cons -1
+                    (mapcar #'(lambda (x) (- (string-to-char x) 97))
+                            (mapcar 'string s))) ; reduce letters to numbers, a --> 0
+              )) ; ensure we have an unused/empty "high order" place
+        (add (make-list (length num) 0))
+        )
+    (setcar add 1)
+    (while (< 0 (apply '+ add))
+      (progn
+        (setq num (mapcar-star '+ num add))
+        (setq add (cons 0 (reverse (cdr (reverse (mapcar #'(lambda (x) (floor x 26)) num))))))
+        (setq num (mapcar #'(lambda (x) (if (<= 0 x) (mod x 26) -1)) num))))
+    (apply 'concat (mapcar #'(lambda (x) (char-to-string (+ 97 x)))
+                           (if (> 0 (nth (- (length num) 1) num))
+                               (cdr (reverse num))
+                             (reverse num))
+                           ))))
+
 (defun markdown-insert-list-item (&optional arg)
   "Insert a new list item.
 If the point is inside unordered list, insert a bullet mark.  If
@@ -3786,11 +3822,28 @@ increase the indentation by one level."
                       ((= arg 4) (max (- item-indent 4) 0))
                       ((= arg 16) (+ item-indent 4))
                       (t item-indent)))
+        (when (= arg 4)
+          (setq marker (save-excursion
+                         (markdown-prev-list-item (nth 2 bounds))
+                         (nth 4 (markdown-cur-list-item-bounds)))))
+
         (setq new-indent (make-string indent 32))
         (goto-char new-loc)
         (cond
+         ;; Auto-list, pandoc-style
+         ((string-match "#" marker)
+          (if (= arg 16) ;; starting a new column indented one more level
+              (insert (concat new-indent "1. "))
+            (insert new-indent marker)))
          ;; Ordered list
-         ((string-match "[0-9]" marker)
+         ((string-match "\\b[a-z]+\\b" marker)
+          (if (= arg 16) ;; starting a new column indented one more level
+              (insert (concat new-indent "1. "))
+            (insert (concat new-indent
+                            (replace-regexp-in-string
+                             "\\b[a-z]+\\b"
+                             'markdown-increment-letters marker)))))
+         ((string-match "[0-9]+" marker)
           (if (= arg 16) ;; starting a new column indented one more level
               (insert (concat new-indent "1. "))
             ;; travel up to the last item and pick the correct number.  If
